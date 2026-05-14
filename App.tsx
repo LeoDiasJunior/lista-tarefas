@@ -1,157 +1,268 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
   FlatList,
-  StyleSheet
+  StyleSheet,
+  Alert,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-type Tarefa = {
+type Item = {
   id: string;
-  texto: string;
-  concluida: boolean;
+  descricao: string;
+  comprado: boolean;
 };
 
+const CHAVE_STORAGE = '@lista_tarefas';
+
 export default function App() {
-  const [tarefa, setTarefa] = useState<string>('');
-  const [lista, setLista] = useState<Tarefa[]>([]);
+  const [novaDescricao, setNovaDescricao] = useState<string>('');
+  const [itens, setItens] = useState<Item[]>([]);
 
-  const adicionarTarefa = () => {
-    if (!tarefa.trim()) return;
+  useEffect(() => {
+    carregarItens();
+  }, []);
 
-    const nova: Tarefa = {
-      id: Date.now().toString(),
-      texto: tarefa,
-      concluida: false
-    };
+  useEffect(() => {
+    salvarItens(itens);
+  }, [itens]);
 
-    setLista((prev) => [...prev, nova]);
-    setTarefa('');
+  const carregarItens = async () => {
+    try {
+      const dados = await AsyncStorage.getItem(CHAVE_STORAGE);
+      if (dados !== null) {
+        setItens(JSON.parse(dados));
+      }
+    } catch (erro) {
+      Alert.alert('Erro', 'Não foi possível carregar os itens.');
+    }
   };
 
-  const toggleTarefa = (id: string) => {
-    setLista((prev) =>
-      prev.map((item) =>
-        item.id === id
-          ? { ...item, concluida: !item.concluida }
-          : item
+  const salvarItens = async (lista: Item[]) => {
+    try {
+      await AsyncStorage.setItem(CHAVE_STORAGE, JSON.stringify(lista));
+    } catch (erro) {
+      Alert.alert('Erro', 'Não foi possível salvar os itens.');
+    }
+  };
+
+  const incluirItem = () => {
+    if (!novaDescricao.trim()) {
+      Alert.alert('Atenção', 'Digite uma tarefa antes de adicionar.');
+      return;
+    }
+
+    const novoItem: Item = {
+      id: Date.now().toString(),
+      descricao: novaDescricao.trim(),
+      comprado: false,
+    };
+
+    setItens((anterior) => [...anterior, novoItem]);
+    setNovaDescricao('');
+  };
+
+  const alternarStatus = (id: string) => {
+    setItens((anterior) =>
+      anterior.map((item) =>
+        item.id === id ? { ...item, comprado: !item.comprado } : item
       )
     );
   };
 
-  const removerTarefa = (id: string) => {
-    setLista((prev) => prev.filter((item) => item.id !== id));
+  const excluirItem = (id: string) => {
+    setItens((anterior) => anterior.filter((item) => item.id !== id));
   };
 
+  const limparLista = () => {
+    Alert.alert(
+      'Limpar lista',
+      'Deseja remover todos os itens da lista?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Limpar',
+          style: 'destructive',
+          onPress: () => setItens([]),
+        },
+      ]
+    );
+  };
+
+  const totalComprados = itens.filter((item) => item.comprado).length;
+  const totalPendentes = itens.length - totalComprados;
+
   return (
-    <View style={styles.container}>
-      <Text style={styles.titulo}>Minhas Tarefas</Text>
+    <View style={estilos.pagina}>
+      <Text style={estilos.titulo}>Lista de Tarefas</Text>
 
-      <View style={styles.inputArea}>
+      {/* Contador */}
+      {itens.length > 0 && (
+        <View style={estilos.contadorContainer}>
+          <Text style={estilos.contadorTexto}>
+            ✓ {totalComprados} comprado{totalComprados !== 1 ? 's' : ''}
+          </Text>
+          <Text style={estilos.contadorTexto}>
+            ○ {totalPendentes} pendente{totalPendentes !== 1 ? 's' : ''}
+          </Text>
+        </View>
+      )}
+
+      {/* Campo de entrada */}
+      <View style={estilos.linha}>
         <TextInput
-          placeholder="Digite uma tarefa..."
-          placeholderTextColor="#94a3b8"
-          value={tarefa}
-          onChangeText={setTarefa}
-          style={styles.input}
+          style={estilos.campo}
+          placeholder="Nova tarefa..."
+          placeholderTextColor="#999"
+          value={novaDescricao}
+          onChangeText={setNovaDescricao}
+          onSubmitEditing={incluirItem}
+          returnKeyType="done"
         />
-
-        <TouchableOpacity style={styles.botao} onPress={adicionarTarefa}>
-          <Text style={styles.botaoTexto}>+</Text>
+        <TouchableOpacity style={estilos.botaoAdicionar} onPress={incluirItem}>
+          <Text style={estilos.textoBotao}>Adicionar</Text>
         </TouchableOpacity>
       </View>
 
+      {/* Lista */}
       <FlatList
-        data={lista}
+        data={itens}
         keyExtractor={(item) => item.id}
+        ListEmptyComponent={
+          <Text style={estilos.listaVazia}>Nenhuma tarefa adicionada.</Text>
+        }
         renderItem={({ item }) => (
-          <View style={styles.card}>
-            <TouchableOpacity onPress={() => toggleTarefa(item.id)}>
-              <Text
-                style={[
-                  styles.texto,
-                  item.concluida && styles.concluida
-                ]}
-              >
-                {item.texto}
+          <View style={[estilos.cartao, item.comprado && estilos.cartaoComprado]}>
+            <TouchableOpacity
+              style={estilos.areaTexto}
+              onPress={() => alternarStatus(item.id)}
+            >
+              <Text style={[estilos.descricao, item.comprado && estilos.comprado]}>
+                {item.comprado ? '✓ ' : '○ '}
+                {item.descricao}
               </Text>
             </TouchableOpacity>
 
-            <TouchableOpacity onPress={() => removerTarefa(item.id)}>
-              <Text style={styles.delete}>🗑️</Text>
+            <TouchableOpacity onPress={() => excluirItem(item.id)}>
+              <Text style={estilos.botaoExcluir}>Excluir</Text>
             </TouchableOpacity>
           </View>
         )}
       />
+
+      {/* Botão limpar lista */}
+      {itens.length > 0 && (
+        <TouchableOpacity style={estilos.botaoLimpar} onPress={limparLista}>
+          <Text style={estilos.textoBotaoLimpar}>Limpar lista</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
+const estilos = StyleSheet.create({
+  pagina: {
     flex: 1,
-    backgroundColor: '#0f172a',
+    backgroundColor: '#f5f5f5',
     padding: 20,
-    paddingTop: 60
+    paddingTop: 60,
   },
-
   titulo: {
-    fontSize: 26,
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  contadorContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 20,
+    marginBottom: 16,
+  },
+  contadorTexto: {
+    fontSize: 13,
+    color: '#666',
+    fontWeight: '500',
+  },
+  linha: {
+    flexDirection: 'row',
+    marginBottom: 20,
+    gap: 10,
+  },
+  campo: {
+    flex: 1,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 15,
+    color: '#333',
+  },
+  botaoAdicionar: {
+    backgroundColor: '#4a90d9',
+    borderRadius: 8,
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+  },
+  textoBotao: {
     color: '#fff',
     fontWeight: 'bold',
-    marginBottom: 20
+    fontSize: 14,
   },
-
-  inputArea: {
+  listaVazia: {
+    textAlign: 'center',
+    color: '#aaa',
+    marginTop: 40,
+    fontSize: 14,
+  },
+  cartao: {
     flexDirection: 'row',
-    marginBottom: 20
-  },
-
-  input: {
-    flex: 1,
-    backgroundColor: '#1e293b',
-    color: '#fff',
-    padding: 12,
-    borderRadius: 10
-  },
-
-  botao: {
-    marginLeft: 10,
-    backgroundColor: '#22c55e',
-    paddingHorizontal: 20,
-    justifyContent: 'center',
-    borderRadius: 10
-  },
-
-  botaoTexto: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: 'bold'
-  },
-
-  card: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#1e293b',
-    padding: 15,
-    borderRadius: 12,
-    marginBottom: 10
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 14,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
   },
-
-  texto: {
-    color: '#fff',
-    fontSize: 16
+  cartaoComprado: {
+    backgroundColor: '#f0f7f0',
+    borderColor: '#b2dfb2',
   },
-
-  concluida: {
+  areaTexto: {
+    flex: 1,
+  },
+  descricao: {
+    fontSize: 15,
+    color: '#333',
+  },
+  comprado: {
     textDecorationLine: 'line-through',
-    color: '#94a3b8'
+    color: '#aaa',
   },
-
-  delete: {
-    fontSize: 18
-  }
+  botaoExcluir: {
+    color: '#e53935',
+    fontWeight: 'bold',
+    fontSize: 13,
+  },
+  botaoLimpar: {
+    marginTop: 10,
+    marginBottom: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e53935',
+    alignItems: 'center',
+  },
+  textoBotaoLimpar: {
+    color: '#e53935',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
 });

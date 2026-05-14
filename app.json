@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "appBlank",
-    "slug": "appBlank",
+    "name": "ListaDeTarefas",
+    "slug": "lista-de-tarefas",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -16,15 +16,13 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
-      },
-      "predictiveBackGestureEnabled": false
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#f5f5f5"
+      }
     },
     "web": {
       "favicon": "./assets/favicon.png"
     }
   }
 }
+
